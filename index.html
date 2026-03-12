@@ -2,667 +2,589 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Triple Pendulum</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
     body {
       background: #0f0f14;
       color: #d0d0e8;
       font-family: 'Courier New', monospace;
-      height: 100vh;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      user-select: none;
     }
 
-    #controls {
-      display: flex;
+    /* ── SHARED BUTTON STYLE ── */
+    button {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      padding: 5px 12px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: transparent;
+      color: #d0d0e8;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    button:hover  { background: rgba(255,255,255,0.07); }
+    button:active { background: rgba(255,255,255,0.15); }
+    button.active { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.35); }
+
+    /* ── CANVAS ── */
+    canvas { flex: 1; display: block; touch-action: none; }
+
+    /* ════════════════════════════════════════════
+       DESKTOP CONTROLS  (>= 700px)
+       Full bar across the top with all sliders
+    ════════════════════════════════════════════ */
+    #desktop-controls {
+      display: none; /* hidden on mobile, shown on desktop below */
       flex-wrap: wrap;
-      gap: 20px;
+      gap: 14px;
       align-items: center;
-      padding: 10px 20px;
-      background: rgba(255,255,255,0.07);
-      border-bottom: 1px solid rgba(255,255,255,0.07);
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
       flex-shrink: 0;
     }
 
     .ctrl {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       font-size: 12px;
     }
+    .ctrl label { color: #b0b8d0; white-space: nowrap; }
+    .ctrl input[type="range"] { width: 80px; accent-color: #7c6fff; }
+    .ctrl span { font-size: 12px; font-weight: bold; min-width: 38px; color: #d0d0e8; }
 
-    .ctrl label {
-      white-space: nowrap;
-      color: #b0b8d0;
-    }
-
-    .dot {
-      width: 9px; height: 9px;
-      border-radius: 50%;
-      display: inline-block;
+    .divider {
+      width: 1px; height: 22px;
+      background: rgba(255,255,255,0.15);
       flex-shrink: 0;
     }
 
-    .ctrl input[type="range"] {
-      width: 80px;
-    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
 
-    .ctrl span {
-      font-size: 12px;
-      font-weight: bold;
-      min-width: 32px;
+    /* ════════════════════════════════════════════
+       MOBILE CONTROLS  (< 700px)
+       Slim top bar with buttons + gear drawer
+    ════════════════════════════════════════════ */
+    #mobile-topbar {
+      display: flex; /* shown on mobile, hidden on desktop below */
+      gap: 8px;
+      align-items: center;
+      padding: 10px 14px;
+      padding-top: max(10px, env(safe-area-inset-top));
+      background: rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    #mobile-topbar button { font-size: 13px; padding: 7px 14px; min-height: 36px; }
+
+    #drawerToggle {
+      position: fixed;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      right: 18px;
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.25);
       color: #d0d0e8;
-    }
-
-    .divider {
-      width: 1px;
-      height: 24px;
-      background: rgba(255,255,255,0.2);
-    }
-
-    button {
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
-      padding: 5px 14px;
-      border: 1px solid rgba(255,255,255,0.15);
-      background: transparent;
-      color: #d0d0e8;
-      border-radius: 4px;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
+      z-index: 20;
       transition: background 0.15s;
     }
-    button:hover { background: rgba(255,255,255,0.07); }
-    button.active { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.3); }
+    #drawerToggle:active { background: rgba(255,255,255,0.22); }
+
+    #drawer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #1a1a24;
+      border-top: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px 16px 0 0;
+      padding: 16px 20px;
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
+      z-index: 10;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      max-height: 70dvh;
+      overflow-y: auto;
+    }
+    #drawer.open { transform: translateY(0); }
+
+    #drawerHandle {
+      width: 36px; height: 4px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+      margin: 0 auto 16px;
+    }
+
+    .section-title {
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.3);
+      text-transform: uppercase;
+      margin: 14px 0 8px;
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    .slider-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 48px;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .slider-label {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 13px; color: #b0b8d0; white-space: nowrap;
+    }
+    .slider-val { font-size: 12px; font-weight: bold; color: #d0d0e8; text-align: right; }
 
     #hint {
       position: fixed;
-      bottom: 14px;
-      left: 50%;
+      bottom: 76px; left: 50%;
       transform: translateX(-50%);
       font-size: 11px;
-      color: rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.18);
       pointer-events: none;
       white-space: nowrap;
+      transition: opacity 0.3s;
     }
+    #hint.hidden { opacity: 0; }
 
-    canvas {
-      flex: 1;
-      display: block;
-      cursor: grab;
+    /* ════════════════════════════════════════════
+       RESPONSIVE SWITCH
+       >= 700px  →  desktop bar visible, mobile hidden
+       <  700px  →  mobile bar visible, desktop hidden
+    ════════════════════════════════════════════ */
+    @media (min-width: 700px) {
+      #desktop-controls { display: flex; }
+      #mobile-topbar    { display: none; }
+      #drawerToggle     { display: none; }
+      #drawer           { display: none; }
+      #hint             { display: none; }
     }
-    canvas.dragging { cursor: grabbing; }
   </style>
 </head>
 <body>
 
-<div id="controls">
-  <!-- Arm length sliders -->
+<!-- ── DESKTOP: full control bar ── -->
+<div id="desktop-controls">
   <div class="ctrl">
     <span class="dot" style="background:#ff6b6b"></span>
     <label>Arm 1</label>
-    <input type="range" id="l1" min="40" max="180" value="110" step="1">
-    <span id="l1v">110</span>
+    <input type="range" id="dl1" min="40" max="180" value="110" step="1">
+    <span id="dl1v">110</span>
   </div>
   <div class="ctrl">
     <span class="dot" style="background:#ffd93d"></span>
     <label>Arm 2</label>
-    <input type="range" id="l2" min="40" max="180" value="100" step="1">
-    <span id="l2v">100</span>
+    <input type="range" id="dl2" min="40" max="180" value="100" step="1">
+    <span id="dl2v">100</span>
   </div>
   <div class="ctrl">
     <span class="dot" style="background:#6bcb77"></span>
     <label>Arm 3</label>
-    <input type="range" id="l3" min="40" max="180" value="90" step="1">
-    <span id="l3v">90</span>
+    <input type="range" id="dl3" min="40" max="180" value="90" step="1">
+    <span id="dl3v">90</span>
   </div>
 
   <div class="divider"></div>
 
-  <!-- Bob mass sliders -->
   <div class="ctrl">
     <label>Mass 1</label>
-    <input type="range" id="m1" min="0.5" max="4" value="1.5" step="0.1">
-    <span id="m1v">1.5</span>
+    <input type="range" id="dm1" min="0.5" max="4" value="1.5" step="0.1">
+    <span id="dm1v">1.5</span>
   </div>
   <div class="ctrl">
     <label>Mass 2</label>
-    <input type="range" id="m2" min="0.5" max="4" value="1.5" step="0.1">
-    <span id="m2v">1.5</span>
+    <input type="range" id="dm2" min="0.5" max="4" value="1.5" step="0.1">
+    <span id="dm2v">1.5</span>
   </div>
   <div class="ctrl">
     <label>Mass 3</label>
-    <input type="range" id="m3" min="0.5" max="4" value="1.5" step="0.1">
-    <span id="m3v">1.5</span>
+    <input type="range" id="dm3" min="0.5" max="4" value="1.5" step="0.1">
+    <span id="dm3v">1.5</span>
   </div>
 
   <div class="divider"></div>
 
   <div class="ctrl">
     <label>Speed</label>
-    <input type="range" id="speed" min="1" max="30" value="16" step="1">
-    <span id="speedv">16x</span>
+    <input type="range" id="dspeed" min="1" max="30" value="16" step="1">
+    <span id="dspeedv">16x</span>
   </div>
   <div class="ctrl">
     <label>Damping</label>
-    <input type="range" id="damping" min="0" max="100" value="100" step="1">
-    <span id="dampingv">1.0000</span>
+    <input type="range" id="ddamping" min="0" max="100" value="100" step="1">
+    <span id="ddampingv">1.000</span>
   </div>
 
   <div class="divider"></div>
 
-  <button id="trailBtn" onclick="toggleTrail()" class="active">Trail on</button>
-  <button id="soundBtn" onclick="toggleSound()">Sound off</button>
-  <button id="stopBtn" onclick="toggleStop()">Stop</button>
+  <button id="dtrailBtn" onclick="toggleTrail()" class="active">Trail on</button>
+  <button id="dsoundBtn" onclick="toggleSound()">Sound off</button>
+  <button id="dstopBtn"  onclick="toggleStop()">Stop</button>
+  <button onclick="resetSim()">Reset</button>
+</div>
+
+<!-- ── MOBILE: slim top bar ── -->
+<div id="mobile-topbar">
+  <button id="mtrailBtn" onclick="toggleTrail()" class="active">Trail</button>
+  <button id="msoundBtn" onclick="toggleSound()">Sound</button>
+  <button id="mstopBtn"  onclick="toggleStop()">Stop</button>
   <button onclick="resetSim()">Reset</button>
 </div>
 
 <canvas id="canvas"></canvas>
-<div id="hint">drag any bob to set starting angle · release to simulate</div>
+
+<div id="hint">drag a bob · release to swing</div>
+<div id="drawerToggle" onclick="toggleDrawer()">&#9881;</div>
+
+<!-- ── MOBILE: slide-up drawer ── -->
+<div id="drawer">
+  <div id="drawerHandle"></div>
+
+  <div class="section-title">Arm lengths</div>
+  <div class="slider-row">
+    <div class="slider-label"><span class="dot" style="background:#ff6b6b"></span>Arm 1</div>
+    <input type="range" id="ml1" min="40" max="180" value="110" step="1">
+    <div class="slider-val" id="ml1v">110</div>
+  </div>
+  <div class="slider-row">
+    <div class="slider-label"><span class="dot" style="background:#ffd93d"></span>Arm 2</div>
+    <input type="range" id="ml2" min="40" max="180" value="100" step="1">
+    <div class="slider-val" id="ml2v">100</div>
+  </div>
+  <div class="slider-row">
+    <div class="slider-label"><span class="dot" style="background:#6bcb77"></span>Arm 3</div>
+    <input type="range" id="ml3" min="40" max="180" value="90" step="1">
+    <div class="slider-val" id="ml3v">90</div>
+  </div>
+
+  <div class="section-title">Bob mass</div>
+  <div class="slider-row">
+    <div class="slider-label"><span class="dot" style="background:#ff6b6b"></span>Mass 1</div>
+    <input type="range" id="mm1" min="0.5" max="4" value="1.5" step="0.1">
+    <div class="slider-val" id="mm1v">1.5</div>
+  </div>
+  <div class="slider-row">
+    <div class="slider-label"><span class="dot" style="background:#ffd93d"></span>Mass 2</div>
+    <input type="range" id="mm2" min="0.5" max="4" value="1.5" step="0.1">
+    <div class="slider-val" id="mm2v">1.5</div>
+  </div>
+  <div class="slider-row">
+    <div class="slider-label"><span class="dot" style="background:#6bcb77"></span>Mass 3</div>
+    <input type="range" id="mm3" min="0.5" max="4" value="1.5" step="0.1">
+    <div class="slider-val" id="mm3v">1.5</div>
+  </div>
+
+  <div class="section-title">Simulation</div>
+  <div class="slider-row">
+    <div class="slider-label">Speed</div>
+    <input type="range" id="mspeed" min="1" max="30" value="16" step="1">
+    <div class="slider-val" id="mspeedv">16x</div>
+  </div>
+  <div class="slider-row">
+    <div class="slider-label">Damping</div>
+    <input type="range" id="mdamping" min="0" max="100" value="100" step="1">
+    <div class="slider-val" id="mdampingv">1.000</div>
+  </div>
+</div>
 
 <script>
-  // ─── CANVAS SETUP ─────────────────────────────────────────────────────────
-  const canvas = document.getElementById('canvas');
-  const ctx    = canvas.getContext('2d');
-  const ctrlBar = document.getElementById('controls');
+  const canvas  = document.getElementById('canvas');
+  const ctx     = canvas.getContext('2d');
+
+  // Figure out which control bar is visible for height calculation
+  function controlBarHeight() {
+    const d = document.getElementById('desktop-controls');
+    const m = document.getElementById('mobile-topbar');
+    return (d.offsetParent !== null ? d : m).offsetHeight;
+  }
 
   function resize() {
     canvas.width  = window.innerWidth;
-    canvas.height = window.innerHeight - ctrlBar.offsetHeight;
+    canvas.height = window.innerHeight - controlBarHeight();
   }
   window.addEventListener('resize', () => { resize(); resetSim(); });
   resize();
 
-  // ─── PHYSICS CONFIG ───────────────────────────────────────────────────────
-  // Feel free to tweak these!
-  const G          = 9.81;    // gravity constant (pixels/s² scale)
-  const DT         = 0.016;   // time step per frame (seconds)
-  let DAMPING      = 1.0;     // energy loss per frame (1.0 = no damping, 0.999 = slow decay)
-  const BOB_RADIUS = 10;      // visual size of each bob
+  // Physics config
+  const G = 9.81, DT = 0.016;
+  let DAMPING = 1.0;
+  const BOB_RADIUS = 13;
+  let STEPS_PER_FRAME = 16;
 
-  let STEPS_PER_FRAME = 16;   // physics steps per animation frame — controlled by speed slider
-
-  // ─── STATE ────────────────────────────────────────────────────────────────
-  let L1, L2, L3;     // arm lengths (px)
-  let M1, M2, M3;     // bob masses
-
-  // Angles from vertical (radians), angular velocities
-  let a1, a2, a3;
-  let v1, v2, v3;
-
-  let paused      = false;
-  let showTrail   = true;
-  let trail       = [];
+  // State
+  let L1, L2, L3, M1, M2, M3;
+  let a1, a2, a3, v1, v2, v3;
+  let paused = false, showTrail = true;
+  let trail = [];
   const MAX_TRAIL = 800;
+  let dragging = null, pivotX, pivotY;
+  let audioCtx = null, soundOn = false;
 
-  // Drag state
-  let dragging    = null;   // null | 1 | 2 | 3
-  let pivotX, pivotY;       // canvas pivot point
+  // ── Read whichever slider set is active ──
+  function isDesktop() { return window.innerWidth >= 700; }
 
-  // Sound state — declared here so loop() can reference them before the sound engine is defined
-  let audioCtx = null;
-  let soundOn  = false;
-
-  // ─── READ SLIDERS ─────────────────────────────────────────────────────────
   function readSliders() {
-    L1 = +document.getElementById('l1').value;
-    L2 = +document.getElementById('l2').value;
-    L3 = +document.getElementById('l3').value;
-    M1 = +document.getElementById('m1').value;
-    M2 = +document.getElementById('m2').value;
-    M3 = +document.getElementById('m3').value;
+    const p = isDesktop() ? 'd' : 'm';
+    L1 = +document.getElementById(p+'l1').value;
+    L2 = +document.getElementById(p+'l2').value;
+    L3 = +document.getElementById(p+'l3').value;
+    M1 = +document.getElementById(p+'m1').value;
+    M2 = +document.getElementById(p+'m2').value;
+    M3 = +document.getElementById(p+'m3').value;
   }
 
-  // ─── RESET ────────────────────────────────────────────────────────────────
   function resetSim() {
     readSliders();
-    pivotX = canvas.width  / 2;
+    pivotX = canvas.width / 2;
     pivotY = canvas.height * 0.18;
-
-    // Start at a slight angle — interesting but not chaotic immediately
-    a1 = Math.PI / 3;
-    a2 = Math.PI / 4;
-    a3 = Math.PI / 6;
+    a1 = Math.PI/3; a2 = Math.PI/4; a3 = Math.PI/6;
     v1 = 0; v2 = 0; v3 = 0;
-
-    trail   = [];
-    paused  = false;
-
-    // Clear canvas
+    trail = []; paused = false;
+    ['dstopBtn','mstopBtn'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) { b.textContent = id.startsWith('d') ? 'Stop' : 'Stop'; b.classList.remove('active'); }
+    });
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   }
-
   resetSim();
 
-  // ─── TRIPLE PENDULUM PHYSICS ──────────────────────────────────────────────
-  // Uses Runge-Kutta 4 (RK4) for numerical stability.
-  // Equations derived from the Lagrangian of a triple pendulum.
-  //
-  // State vector: [a1, v1, a2, v2, a3, v3]
-  // Returns derivatives: [v1, accel1, v2, accel2, v3, accel3]
-
-  function derivatives(a1, v1, a2, v2, a3, v3) {
-    const g  = G;
-    const l1 = L1, l2 = L2, l3 = L3;
-    const m1 = M1, m2 = M2, m3 = M3;
-
-    const d12 = a1 - a2;
-    const d13 = a1 - a3;
-    const d23 = a2 - a3;
-
-    const s12 = Math.sin(d12), c12 = Math.cos(d12);
-    const s13 = Math.sin(d13), c13 = Math.cos(d13);
-    const s23 = Math.sin(d23), c23 = Math.cos(d23);
-
-    const s1  = Math.sin(a1), s2 = Math.sin(a2), s3 = Math.sin(a3);
-
-    const M_tot = m1 + m2 + m3;
-    const M23   = m2 + m3;
-
-    // Mass matrix (3x3, symmetric)
-    const A11 = M_tot * l1 * l1;
-    const A12 = M23  * l1 * l2 * c12;
-    const A13 = m3   * l1 * l3 * c13;
-    const A22 = M23  * l2 * l2;
-    const A23 = m3   * l2 * l3 * c23;
-    const A33 = m3   * l3 * l3;
-
-    // Forcing terms (RHS)
-    const f1 = -M23  * l1 * l2 * v2 * v2 * s12
-               - m3   * l1 * l3 * v3 * v3 * s13
-               - M_tot * g * l1 * s1;
-
-    const f2 =  M23  * l1 * l2 * v1 * v1 * s12
-               - m3   * l2 * l3 * v3 * v3 * s23
-               - M23  * g * l2 * s2;
-
-    const f3 =  m3   * l1 * l3 * v1 * v1 * s13
-               + m3   * l2 * l3 * v2 * v2 * s23
-               - m3   * g * l3 * s3;
-
-    // Solve 3×3 linear system A·acc = f  (Cramer's rule / direct expansion)
-    // [A11 A12 A13] [acc1]   [f1]
-    // [A12 A22 A23] [acc2] = [f2]
-    // [A13 A23 A33] [acc3]   [f3]
-    const det = A11*(A22*A33 - A23*A23)
-              - A12*(A12*A33 - A23*A13)
-              + A13*(A12*A23 - A22*A13);
-
-    const acc1 = (f1*(A22*A33 - A23*A23)
-                - A12*(f2*A33  - A23*f3)
-                + A13*(f2*A23  - A22*f3)) / det;
-
-    const acc2 = (A11*(f2*A33  - A23*f3)
-                - f1*(A12*A33  - A23*A13)
-                + A13*(A12*f3  - f2*A13)) / det;
-
-    const acc3 = (A11*(A22*f3  - f2*A23)
-                - A12*(A12*f3  - f2*A13)
-                + f1*(A12*A23  - A22*A13)) / det;
-
-    return [v1, acc1, v2, acc2, v3, acc3];
+  // ── RK4 Physics ──
+  function derivatives(a1,v1,a2,v2,a3,v3) {
+    const l1=L1,l2=L2,l3=L3,m1=M1,m2=M2,m3=M3;
+    const d12=a1-a2,d13=a1-a3,d23=a2-a3;
+    const s12=Math.sin(d12),c12=Math.cos(d12),s13=Math.sin(d13),c13=Math.cos(d13),s23=Math.sin(d23),c23=Math.cos(d23);
+    const s1=Math.sin(a1),s2=Math.sin(a2),s3=Math.sin(a3);
+    const Mt=m1+m2+m3,M23=m2+m3;
+    const A11=Mt*l1*l1,A12=M23*l1*l2*c12,A13=m3*l1*l3*c13;
+    const A22=M23*l2*l2,A23=m3*l2*l3*c23,A33=m3*l3*l3;
+    const f1=-M23*l1*l2*v2*v2*s12-m3*l1*l3*v3*v3*s13-Mt*G*l1*s1;
+    const f2= M23*l1*l2*v1*v1*s12-m3*l2*l3*v3*v3*s23-M23*G*l2*s2;
+    const f3= m3*l1*l3*v1*v1*s13+m3*l2*l3*v2*v2*s23-m3*G*l3*s3;
+    const det=A11*(A22*A33-A23*A23)-A12*(A12*A33-A23*A13)+A13*(A12*A23-A22*A13);
+    return [v1,(f1*(A22*A33-A23*A23)-A12*(f2*A33-A23*f3)+A13*(f2*A23-A22*f3))/det,
+               v2,(A11*(f2*A33-A23*f3)-f1*(A12*A33-A23*A13)+A13*(A12*f3-f2*A13))/det,
+               v3,(A11*(A22*f3-f2*A23)-A12*(A12*f3-f2*A13)+f1*(A12*A23-A22*A13))/det];
   }
 
   function rk4Step() {
-    const h = DT;
-    const [da1, dv1, da2, dv2, da3, dv3] = [a1, v1, a2, v2, a3, v3];
-
-    const k1 = derivatives(da1,          dv1,          da2,          dv2,          da3,          dv3);
-    const k2 = derivatives(da1+h/2*k1[0],dv1+h/2*k1[1],da2+h/2*k1[2],dv2+h/2*k1[3],da3+h/2*k1[4],dv3+h/2*k1[5]);
-    const k3 = derivatives(da1+h/2*k2[0],dv1+h/2*k2[1],da2+h/2*k2[2],dv2+h/2*k2[3],da3+h/2*k2[4],dv3+h/2*k2[5]);
-    const k4 = derivatives(da1+h*k3[0],  dv1+h*k3[1],  da2+h*k3[2],  dv2+h*k3[3],  da3+h*k3[4],  dv3+h*k3[5]);
-
-    a1 += h/6 * (k1[0] + 2*k2[0] + 2*k3[0] + k4[0]);
-    v1 += h/6 * (k1[1] + 2*k2[1] + 2*k3[1] + k4[1]);
-    a2 += h/6 * (k1[2] + 2*k2[2] + 2*k3[2] + k4[2]);
-    v2 += h/6 * (k1[3] + 2*k2[3] + 2*k3[3] + k4[3]);
-    a3 += h/6 * (k1[4] + 2*k2[4] + 2*k3[4] + k4[4]);
-    v3 += h/6 * (k1[5] + 2*k2[5] + 2*k3[5] + k4[5]);
-
-    // Apply damping
-    v1 *= DAMPING;
-    v2 *= DAMPING;
-    v3 *= DAMPING;
+    const h=DT;
+    const k1=derivatives(a1,v1,a2,v2,a3,v3);
+    const k2=derivatives(a1+h/2*k1[0],v1+h/2*k1[1],a2+h/2*k1[2],v2+h/2*k1[3],a3+h/2*k1[4],v3+h/2*k1[5]);
+    const k3=derivatives(a1+h/2*k2[0],v1+h/2*k2[1],a2+h/2*k2[2],v2+h/2*k2[3],a3+h/2*k2[4],v3+h/2*k2[5]);
+    const k4=derivatives(a1+h*k3[0],v1+h*k3[1],a2+h*k3[2],v2+h*k3[3],a3+h*k3[4],v3+h*k3[5]);
+    a1+=h/6*(k1[0]+2*k2[0]+2*k3[0]+k4[0]); v1+=h/6*(k1[1]+2*k2[1]+2*k3[1]+k4[1]);
+    a2+=h/6*(k1[2]+2*k2[2]+2*k3[2]+k4[2]); v2+=h/6*(k1[3]+2*k2[3]+2*k3[3]+k4[3]);
+    a3+=h/6*(k1[4]+2*k2[4]+2*k3[4]+k4[4]); v3+=h/6*(k1[5]+2*k2[5]+2*k3[5]+k4[5]);
+    v1*=DAMPING; v2*=DAMPING; v3*=DAMPING;
   }
 
-  // ─── COMPUTE BOB POSITIONS ────────────────────────────────────────────────
   function getBobPositions() {
-    const x1 = pivotX + L1 * Math.sin(a1);
-    const y1 = pivotY + L1 * Math.cos(a1);
-    const x2 = x1    + L2 * Math.sin(a2);
-    const y2 = y1    + L2 * Math.cos(a2);
-    const x3 = x2    + L3 * Math.sin(a3);
-    const y3 = y2    + L3 * Math.cos(a3);
-    return { x1, y1, x2, y2, x3, y3 };
+    const x1=pivotX+L1*Math.sin(a1),y1=pivotY+L1*Math.cos(a1);
+    const x2=x1+L2*Math.sin(a2),y2=y1+L2*Math.cos(a2);
+    const x3=x2+L3*Math.sin(a3),y3=y2+L3*Math.cos(a3);
+    return {x1,y1,x2,y2,x3,y3};
   }
 
-  // ─── DRAW ─────────────────────────────────────────────────────────────────
   function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const { x1, y1, x2, y2, x3, y3 } = getBobPositions();
-
-    // Trail
-    if (showTrail && trail.length > 1) {
-      for (let i = 1; i < trail.length; i++) {
-        const alpha = (i / trail.length) * 0.6;
-        ctx.beginPath();
-        ctx.moveTo(trail[i-1].x, trail[i-1].y);
-        ctx.lineTo(trail[i].x,   trail[i].y);
-        ctx.strokeStyle = `rgba(107, 203, 119, ${alpha})`;
-        ctx.lineWidth   = 1.2;
-        ctx.stroke();
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const {x1,y1,x2,y2,x3,y3}=getBobPositions();
+    if (showTrail && trail.length>1) {
+      for (let i=1;i<trail.length;i++) {
+        const alpha=(i/trail.length)*0.6;
+        ctx.beginPath(); ctx.moveTo(trail[i-1].x,trail[i-1].y); ctx.lineTo(trail[i].x,trail[i].y);
+        ctx.strokeStyle=`rgba(107,203,119,${alpha})`; ctx.lineWidth=1.5; ctx.stroke();
       }
     }
-
-    // Pivot point
-    ctx.beginPath();
-    ctx.arc(pivotX, pivotY, 5, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fill();
-
-    // Arms
-    const armColor = 'rgba(255,255,255,0.35)';
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = armColor;
-
-    ctx.beginPath(); ctx.moveTo(pivotX, pivotY); ctx.lineTo(x1, y1); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x1, y1);         ctx.lineTo(x2, y2); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x2, y2);         ctx.lineTo(x3, y3); ctx.stroke();
-
-    // Bobs (with glow effect via multiple circles)
-    const bobs = [
-      { x: x1, y: y1, color: '#ff6b6b', glow: 'rgba(255,107,107,0.25)' },
-      { x: x2, y: y2, color: '#ffd93d', glow: 'rgba(255,217,61,0.25)' },
-      { x: x3, y: y3, color: '#6bcb77', glow: 'rgba(107,203,119,0.25)' },
-    ];
-
-    bobs.forEach(b => {
-      // Outer glow
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, BOB_RADIUS * 2.2, 0, Math.PI * 2);
-      ctx.fillStyle = b.glow;
-      ctx.fill();
-      // Bob
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, BOB_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = b.color;
-      ctx.fill();
-      // Highlight
-      ctx.beginPath();
-      ctx.arc(b.x - 3, b.y - 3, BOB_RADIUS * 0.35, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.fill();
+    ctx.beginPath(); ctx.arc(pivotX,pivotY,5,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.fill();
+    ctx.lineWidth=2.5; ctx.strokeStyle='rgba(255,255,255,0.35)';
+    [[pivotX,pivotY,x1,y1],[x1,y1,x2,y2],[x2,y2,x3,y3]].forEach(([x0,y0,x1,y1])=>{
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
     });
-
-    // Drag handle indicator when paused / dragging
-    if (paused || dragging !== null) {
-      bobs.forEach((b, i) => {
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, BOB_RADIUS + 5, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 3]);
-        ctx.stroke();
-        ctx.setLineDash([]);
+    const bobs=[{x:x1,y:y1,color:'#ff6b6b',glow:'rgba(255,107,107,0.25)'},
+                {x:x2,y:y2,color:'#ffd93d',glow:'rgba(255,217,61,0.25)'},
+                {x:x3,y:y3,color:'#6bcb77',glow:'rgba(107,203,119,0.25)'}];
+    bobs.forEach(b=>{
+      ctx.beginPath(); ctx.arc(b.x,b.y,BOB_RADIUS*2.2,0,Math.PI*2); ctx.fillStyle=b.glow; ctx.fill();
+      ctx.beginPath(); ctx.arc(b.x,b.y,BOB_RADIUS,0,Math.PI*2); ctx.fillStyle=b.color; ctx.fill();
+      ctx.beginPath(); ctx.arc(b.x-3,b.y-3,BOB_RADIUS*0.32,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.fill();
+    });
+    if (paused||dragging!==null) {
+      bobs.forEach(b=>{
+        ctx.beginPath(); ctx.arc(b.x,b.y,BOB_RADIUS+7,0,Math.PI*2);
+        ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
       });
     }
   }
 
-  // ─── MAIN LOOP ────────────────────────────────────────────────────────────
   function loop() {
-    if (!paused && dragging === null) {
-      // Run multiple physics steps per frame — controlled by speed slider
-      for (let i = 0; i < STEPS_PER_FRAME; i++) rk4Step();
-
+    if (!paused&&dragging===null) {
+      for (let i=0;i<STEPS_PER_FRAME;i++) rk4Step();
       if (showTrail) {
-        const { x3, y3 } = getBobPositions();
-        trail.push({ x: x3, y: y3 });
-        if (trail.length > MAX_TRAIL) trail.shift();
+        const {x3,y3}=getBobPositions(); trail.push({x:x3,y:y3});
+        if (trail.length>MAX_TRAIL) trail.shift();
       }
     }
-    updateSound();
-    draw();
+    updateSound(); draw();
     requestAnimationFrame(loop);
   }
-
   loop();
 
-  // ─── DRAG TO SET ANGLE ────────────────────────────────────────────────────
+  // ── Drag ──
   function canvasPos(e) {
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: clientX - rect.left, y: clientY - rect.top };
+    const rect=canvas.getBoundingClientRect(), src=e.touches?e.touches[0]:e;
+    return {x:src.clientX-rect.left, y:src.clientY-rect.top};
   }
-
   function hitBob(pos) {
-    const { x1, y1, x2, y2, x3, y3 } = getBobPositions();
-    const bobs = [{ x: x1, y: y1 }, { x: x2, y: y2 }, { x: x3, y: y3 }];
-    for (let i = 0; i < bobs.length; i++) {
-      const dx = pos.x - bobs[i].x;
-      const dy = pos.y - bobs[i].y;
-      if (Math.sqrt(dx*dx + dy*dy) < BOB_RADIUS * 2.5) return i + 1;
+    const {x1,y1,x2,y2,x3,y3}=getBobPositions();
+    const bobs=[{x:x1,y:y1},{x:x2,y:y2},{x:x3,y:y3}];
+    for (let i=0;i<bobs.length;i++) {
+      const dx=pos.x-bobs[i].x,dy=pos.y-bobs[i].y;
+      if (Math.sqrt(dx*dx+dy*dy)<BOB_RADIUS*3) return i+1;
     }
     return null;
   }
+  function onStart(e) {
+    if (e.target.closest('#drawer')||e.target.closest('#drawerToggle')) return;
+    e.preventDefault();
+    const pos=canvasPos(e),hit=hitBob(pos);
+    if (hit) { dragging=hit; paused=true; v1=0;v2=0;v3=0; trail=[]; document.getElementById('hint').classList.add('hidden'); }
+  }
+  function onMove(e) {
+    if (dragging===null) return; e.preventDefault();
+    const pos=canvasPos(e);
+    if (dragging===3) { const d=Math.atan2(pos.x-pivotX,pos.y-pivotY)-a1; a1+=d;a2+=d;a3+=d; }
+    else if (dragging===2) { const d=Math.atan2(pos.x-pivotX,pos.y-pivotY)-a1; a1+=d;a2+=d;a3=0; }
+    else { a1=Math.atan2(pos.x-pivotX,pos.y-pivotY); a2=0;a3=0; }
+  }
+  function onEnd() { if (dragging!==null) { dragging=null; paused=false; } }
 
-  canvas.addEventListener('mousedown', e => {
-    const pos  = canvasPos(e);
-    const hit  = hitBob(pos);
-    if (hit) {
-      dragging = hit;
-      paused   = true;
-      v1 = 0; v2 = 0; v3 = 0;
-      trail = [];
-      canvas.classList.add('dragging');
-    }
-  });
+  canvas.addEventListener('mousedown',  onStart, {passive:false});
+  canvas.addEventListener('mousemove',  onMove,  {passive:false});
+  canvas.addEventListener('mouseup',    onEnd);
+  canvas.addEventListener('mouseleave', onEnd);
+  canvas.addEventListener('touchstart', onStart, {passive:false});
+  canvas.addEventListener('touchmove',  onMove,  {passive:false});
+  canvas.addEventListener('touchend',   onEnd,   {passive:false});
 
-  // Store relative angles between arms when drag starts,
-  // so lower bobs follow along rigidly like a real pendulum
-  let dragRelA2, dragRelA3;
+  // ── Mobile drawer ──
+  let drawerOpen=false;
+  function toggleDrawer() {
+    drawerOpen=!drawerOpen;
+    document.getElementById('drawer').classList.toggle('open',drawerOpen);
+    document.getElementById('drawerToggle').innerHTML=drawerOpen?'&#10005;':'&#9881;';
+    document.getElementById('hint').classList.toggle('hidden',drawerOpen);
+  }
+  canvas.addEventListener('touchstart',e=>{
+    if (drawerOpen&&!hitBob(canvasPos(e))) toggleDrawer();
+  },{passive:true});
 
-  canvas.addEventListener('mousedown', e => {
-    // Capture relative angles at the moment dragging begins
-    // (this runs AFTER the existing mousedown that sets dragging)
-    dragRelA2 = a2 - a1;   // angle of arm 2 relative to arm 1
-    dragRelA3 = a3 - a2;   // angle of arm 3 relative to arm 2
-  });
-
-  canvas.addEventListener('mousemove', e => {
-    if (dragging === null) return;
-    const pos = canvasPos(e);
-
-    if (dragging === 3) {
-      // Drag bob 3: whole chain follows — solve a1 so bob 3 lands on mouse.
-      // We keep relative angles (a2-a1) and (a3-a2) fixed, rotating the
-      // entire chain as one rigid body around the pivot.
-      const totalReach = L1 + L2 + L3;
-      const dx = pos.x - pivotX;
-      const dy = pos.y - pivotY;
-      // Angle from pivot to mouse — whole chain swings to point there
-      const angle = Math.atan2(dx, dy);
-      const delta = angle - a1;
-      a1 += delta;
-      a2 += delta;
-      a3 += delta;
-    } else if (dragging === 2) {
-      // Drag bob 2: arms 1+2 move as one rigid piece, arm 3 hangs straight down.
-      // Figure out the angle the two-arm segment needs to point so bob 2
-      // lands under the mouse. We do this by rotating a1 and a2 together.
-      const dx = pos.x - pivotX;
-      const dy = pos.y - pivotY;
-      const angle = Math.atan2(dx, dy);   // direction from pivot toward mouse
-      const delta = angle - a1;
-      a1 += delta;
-      a2 += delta;
-      a3 = 0;   // arm 3 hangs straight down (0 = vertical in our convention)
-    } else if (dragging === 1) {
-      // Drag bob 1 only — arms 2 and 3 hang straight down
-      a1 = Math.atan2(pos.x - pivotX, pos.y - pivotY);
-      a2 = 0;   // straight down
-      a3 = 0;   // straight down
-    }
-  });
-
-  function stopDrag() {
-    if (dragging !== null) {
-      dragging = null;
-      paused   = false;
-      canvas.classList.remove('dragging');
-    }
+  // ── Slider binding — syncs both desktop (d) and mobile (m) sliders ──
+  function bindBothSliders(name, onchange, fmt) {
+    ['d'+name, 'm'+name].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.oninput = function() {
+        const val = +this.value;
+        // Keep the other slider in sync
+        const otherId = id.startsWith('d') ? 'm'+name : 'd'+name;
+        const other = document.getElementById(otherId);
+        if (other) other.value = val;
+        // Update both display spans
+        ['d'+name+'v', 'm'+name+'v'].forEach(vid => {
+          const span = document.getElementById(vid);
+          if (span) span.textContent = fmt ? fmt(val) : val;
+        });
+        onchange(val);
+      };
+    });
   }
 
-  canvas.addEventListener('mouseup',    stopDrag);
-  canvas.addEventListener('mouseleave', stopDrag);
+  bindBothSliders('l1', v=>{L1=v;trail=[];});
+  bindBothSliders('l2', v=>{L2=v;trail=[];});
+  bindBothSliders('l3', v=>{L3=v;trail=[];});
+  bindBothSliders('m1', v=>{M1=v;});
+  bindBothSliders('m2', v=>{M2=v;});
+  bindBothSliders('m3', v=>{M3=v;});
+  bindBothSliders('speed',   v=>{STEPS_PER_FRAME=v;}, v=>v+'x');
+  bindBothSliders('damping', v=>{
+    DAMPING=0.9990+v/100*0.0010;
+    ['ddampingv','mdampingv'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=DAMPING.toFixed(4); });
+  });
 
-  // Touch support
-  canvas.addEventListener('touchstart', e => { e.preventDefault(); canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY })); }, { passive: false });
-  canvas.addEventListener('touchmove',  e => { e.preventDefault(); canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY })); }, { passive: false });
-  canvas.addEventListener('touchend',   e => { e.preventDefault(); stopDrag(); }, { passive: false });
-
-  // ─── SLIDERS ──────────────────────────────────────────────────────────────
-  function bindSlider(id, valId, onchange, fmt) {
-    document.getElementById(id).oninput = function () {
-      document.getElementById(valId).textContent = fmt ? fmt(+this.value) : this.value;
-      onchange(+this.value);
-    };
-  }
-
-  bindSlider('l1', 'l1v', v => { L1 = v; trail = []; });
-  bindSlider('l2', 'l2v', v => { L2 = v; trail = []; });
-  bindSlider('l3', 'l3v', v => { L3 = v; trail = []; });
-  bindSlider('m1', 'm1v', v => { M1 = v; });
-  bindSlider('m2', 'm2v', v => { M2 = v; });
-  bindSlider('m3', 'm3v', v => { M3 = v; });
-  bindSlider('speed',   'speedv',   v => { STEPS_PER_FRAME = v; }, v => v + 'x');
-
-  // Slider runs 0–100; maps to 0.9990–1.0000
-  // Narrow high-end range so every position feels useful
-  // At 0   → 0.9990 (noticeable decay, stops in ~10s)
-  // At 50  → 0.9995 (default, very light decay)
-  // At 100 → 1.0000 (no decay, spins forever)
-  document.getElementById('damping').oninput = function () {
-    const t = +this.value / 100;
-    DAMPING = 0.9990 + t * 0.0010;
-    document.getElementById('dampingv').textContent = DAMPING.toFixed(4);
-  };
-
-  // ─── BUTTONS ──────────────────────────────────────────────────────────────
-  function toggleStop() {
-    paused = !paused;
-    const btn = document.getElementById('stopBtn');
-    btn.textContent = paused ? 'Resume' : 'Stop';
-    btn.classList.toggle('active', paused);
+  // ── Buttons — update both desktop and mobile versions ──
+  function setAllButtons(dId, mId, text, active) {
+    [dId, mId].forEach(id => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.textContent = text;
+      active ? b.classList.add('active') : b.classList.remove('active');
+    });
   }
 
   function toggleTrail() {
-    showTrail = !showTrail;
-    trail = [];
-    const btn = document.getElementById('trailBtn');
-    btn.textContent = showTrail ? 'Trail on' : 'Trail off';
-    btn.classList.toggle('active', showTrail);
+    showTrail=!showTrail; trail=[];
+    setAllButtons('dtrailBtn','mtrailBtn', showTrail?'Trail on':'Trail off', showTrail);
   }
-
-  // ─── SOUND ENGINE (Web Audio API) ────────────────────────────────────────
-  // Each bob gets a sine oscillator whose pitch tracks angular velocity.
-  // A soft reverb makes it sound dreamy. Sound is OFF by default.
-
-  // Each bob is tuned to a note — together they form a C major chord
-  const bobAudio = [
-    { baseFreq: 261.6 },   // Bob 1 — C4  (red)
-    { baseFreq: 329.6 },   // Bob 2 — E4  (yellow)
-    { baseFreq: 392.0 },   // Bob 3 — G4  (green)
-  ];
-
-  function buildAudio() {
-    if (audioCtx) return;
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-    // Master gain — keeps overall volume gentle
-    const master = audioCtx.createGain();
-    master.gain.setValueAtTime(0.9, audioCtx.currentTime);
-    master.connect(audioCtx.destination);
-
-    // Convolver reverb: decaying noise burst = room sound
-    const revLen = audioCtx.sampleRate * 2.5;
-    const revBuf = audioCtx.createBuffer(2, revLen, audioCtx.sampleRate);
-    for (let ch = 0; ch < 2; ch++) {
-      const data = revBuf.getChannelData(ch);
-      for (let i = 0; i < revLen; i++) {
-        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / revLen, 2.5);
-      }
-    }
-    const reverb  = audioCtx.createConvolver();
-    reverb.buffer = revBuf;
-
-    const dryGain = audioCtx.createGain();
-    const wetGain = audioCtx.createGain();
-    dryGain.gain.setValueAtTime(0.55, audioCtx.currentTime);
-    wetGain.gain.setValueAtTime(0.45, audioCtx.currentTime);
-    dryGain.connect(master);
-    reverb.connect(wetGain);
-    wetGain.connect(master);
-
-    bobAudio.forEach(b => {
-      // Sine wave = softest, most musical tone
-      const osc = audioCtx.createOscillator();
-      osc.type  = 'sine';
-      osc.frequency.setValueAtTime(b.baseFreq, audioCtx.currentTime);
-      osc.start();
-
-      // Per-bob gain driven by angular velocity
-      const gain = audioCtx.createGain();
-      gain.gain.setValueAtTime(0, audioCtx.currentTime);
-
-      osc.connect(gain);
-      gain.connect(dryGain);
-      gain.connect(reverb);
-
-      b.osc  = osc;
-      b.gain = gain;
-    });
+  function toggleStop() {
+    paused=!paused;
+    setAllButtons('dstopBtn','mstopBtn', paused?'Resume':'Stop', paused);
   }
-
-  function updateSound() {
-    if (!soundOn || !audioCtx) return;
-    const now  = audioCtx.currentTime;
-    const vels = [Math.abs(v1), Math.abs(v2), Math.abs(v3)];
-
-    bobAudio.forEach((b, i) => {
-      // Clamp so high sim-speed doesn't send pitch to the moon
-      const spd = Math.min(vels[i], 15);
-
-      // Pitch rises up to one octave above base as speed increases
-      const freq = b.baseFreq * (1 + spd / 15);
-      b.osc.frequency.setTargetAtTime(freq, now, 0.05);
-
-      // Volume: silent at rest, swells with speed
-      const vol = Math.min(spd / 8, 1) * 1.0;
-      b.gain.gain.setTargetAtTime(vol, now, 0.08);
-    });
-  }
-
   function toggleSound() {
     buildAudio();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx.state==='suspended') audioCtx.resume();
+    soundOn=!soundOn;
+    setAllButtons('dsoundBtn','msoundBtn', soundOn?'Sound on':'Sound off', soundOn);
+    if (!soundOn) { const now=audioCtx.currentTime; bobAudio.forEach(b=>b.gain&&b.gain.gain.setTargetAtTime(0,now,0.05)); }
+  }
 
-    soundOn = !soundOn;
-    const btn = document.getElementById('soundBtn');
-    btn.textContent = soundOn ? 'Sound on' : 'Sound off';
-    btn.classList.toggle('active', soundOn);
-
-    // Fade out all bobs when turning sound off
-    if (!soundOn) {
-      const now = audioCtx.currentTime;
-      bobAudio.forEach(b => b.gain && b.gain.gain.setTargetAtTime(0, now, 0.05));
-    }
+  // ── Sound engine ──
+  const bobAudio=[{baseFreq:261.6},{baseFreq:329.6},{baseFreq:392.0}];
+  function buildAudio() {
+    if (audioCtx) return;
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const master=audioCtx.createGain(); master.gain.setValueAtTime(0.9,audioCtx.currentTime); master.connect(audioCtx.destination);
+    const revLen=audioCtx.sampleRate*2.5, revBuf=audioCtx.createBuffer(2,revLen,audioCtx.sampleRate);
+    for (let ch=0;ch<2;ch++){const d=revBuf.getChannelData(ch);for(let i=0;i<revLen;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/revLen,2.5);}
+    const reverb=audioCtx.createConvolver(); reverb.buffer=revBuf;
+    const dry=audioCtx.createGain(),wet=audioCtx.createGain();
+    dry.gain.setValueAtTime(0.55,audioCtx.currentTime); wet.gain.setValueAtTime(0.45,audioCtx.currentTime);
+    dry.connect(master); reverb.connect(wet); wet.connect(master);
+    bobAudio.forEach(b=>{
+      const osc=audioCtx.createOscillator(); osc.type='sine';
+      osc.frequency.setValueAtTime(b.baseFreq,audioCtx.currentTime); osc.start();
+      const gain=audioCtx.createGain(); gain.gain.setValueAtTime(0,audioCtx.currentTime);
+      osc.connect(gain); gain.connect(dry); gain.connect(reverb);
+      b.osc=osc; b.gain=gain;
+    });
+  }
+  function updateSound() {
+    if (!soundOn||!audioCtx) return;
+    const now=audioCtx.currentTime,vels=[Math.abs(v1),Math.abs(v2),Math.abs(v3)];
+    bobAudio.forEach((b,i)=>{
+      const spd=Math.min(vels[i],15);
+      b.osc.frequency.setTargetAtTime(b.baseFreq*(1+spd/15),now,0.05);
+      b.gain.gain.setTargetAtTime(Math.min(spd/8,1),now,0.08);
+    });
   }
 </script>
-
 </body>
 </html>
