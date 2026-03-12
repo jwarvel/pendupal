@@ -143,8 +143,8 @@
 
   <div class="ctrl">
     <label>Speed</label>
-    <input type="range" id="speed" min="1" max="16" value="4" step="1">
-    <span id="speedv">4x</span>
+    <input type="range" id="speed" min="1" max="30" value="16" step="1">
+    <span id="speedv">16x</span>
   </div>
   <div class="ctrl">
     <label>Damping</label>
@@ -183,7 +183,7 @@
   let DAMPING      = 1.0;     // energy loss per frame (1.0 = no damping, 0.999 = slow decay)
   const BOB_RADIUS = 10;      // visual size of each bob
 
-  let STEPS_PER_FRAME = 4;    // physics steps per animation frame — controlled by speed slider
+  let STEPS_PER_FRAME = 16;   // physics steps per animation frame — controlled by speed slider
 
   // ─── STATE ────────────────────────────────────────────────────────────────
   let L1, L2, L3;     // arm lengths (px)
